@@ -10,7 +10,7 @@ import socket
 SERVER_HOST = '0.0.0.0'
 SERVER_PORT = 8000
 
-# Create socket
+# Create socket:
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server_socket.bind((SERVER_HOST, SERVER_PORT))
@@ -25,10 +25,28 @@ while True:
     request = client_connection.recv(1024).decode()
     print(request)
 
+# Parse HTTP headers
+    headers = request.split('\n')
+    filename = headers[0].split()[1]
+
+    # Get the content of the file
+    if filename == '/':
+        filename = '/index.html'
+    try:
+        fin = open('htdocs' + filename)
+        content = fin.read()
+        fin.close()
+        response = 'HTTP/1.0 200 OK\n\n' + content
+        
+    except FileNotFoundError:
+        response = 'HTTP/1.0 404 NOT FOUND\n\nFile Not Found'
     # Send HTTP response
-    response = 'HTTP/1.0 200 OK\n\nHello World'
+    
     client_connection.sendall(response.encode())
-    client_connection.close()
+    # Get the content of htdocs/index.html
+  
+
+   
 
 # Close socket
 server_socket.close()
