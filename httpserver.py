@@ -45,10 +45,6 @@ class WSGIServer(object):
             response += '\r\n'
             for data in result:
                 response += data.decode('utf-8')
-            # Print formatted response data a la 'curl -v'
-            print(''.join(
-                f'> {line}\n' for line in response.splitlines()
-            ))
         return response
     
     def serve_forever(self):
@@ -58,10 +54,6 @@ class WSGIServer(object):
             self.client_connection, _ = listen_socket.accept()
             # Get the client request
             self.request_data = self.client_connection.recv(1024).decode()
-            print(self.request_data)
-            print(''.join(
-                f'< {line}\n' for line in self.request_data.splitlines()
-            ))
             request_line = self.parse_data(self.request_data)
             # Break down the request line into components
             (self.request_method,  # GET
