@@ -28,34 +28,70 @@ class WSGIServer(object):
     def set_app(self, application):
         self.application = application
    
+    def start_response(self, status, response_headers, exc_info=None):
+        # Add necessary server headers
+        server_headers = [
+            ('Date', 'Sun, 05 Jul 2026 5:54:48 GMT'),
+            ('Server', 'WSGIServer 0.2'),
+        ]
+        self.headers_set = [status, response_headers + server_headers]
     def serve_forever(self):
         listen_socket = self.listen_socket
         while True:
         # Wait for client connections
-            client_connection, client_address = listen_socket.accept()
+            self.client_connection, client_address = listen_socket.accept()
             # Get the client request
-            request_data = client_connection.recv(1024).decode()
+            self.request_data = request_data = self.client_connection.recv(1024).decode()
             print(request_data)
-            # Parse HTTP headers
-            headers = request_data.split('\n')
-            filename = headers[0].split()[1]
-
-            # Get the content of the file
-            if filename == '/':
-                filename = '/index.html'
+            print(''.join(
+                f'< {line}\n' for line in request_data.splitlines()
+            ))
+            request_line = request_data.splitlines()[0]
+            request_line = request_line.rstrip('\r\n')
+            # Break down the request line into components
+            (self.request_method,  # GET
+            self.path,            # /hello
+            self.request_version  # HTTP/1.1
+            ) = request_line.split()
+            env = self.get_environ()
+            result = self.application(env, self.start_response)
             try:
-                fin = open('htdocs' + filename)
-                content = fin.read()
-                fin.close()
-                response = 'HTTP/1.0 200 OK\n\n' + content
-        
-            except FileNotFoundError:
-                response = 'HTTP/1.0 404 NOT FOUND\n\nFile Not Found'
-            #   Send HTTP response
-    
-            client_connection.sendall(response.encode())
-            # Close socket
-            client_connection.close()
+                status, response_headers = self.headers_set
+                response = f'HTTP/1.1 {status}\r\n'
+                for header in response_headers:
+                    response += '{0}: {1}\r\n'.format(*header)
+                response += '\r\n'
+                for data in result:
+                    response += data.decode('utf-8')
+                # Print formatted response data a la 'curl -v'
+                print(''.join(
+                    f'> {line}\n' for line in response.splitlines()
+                ))
+                response_bytes = response.encode()
+                self.client_connection.sendall(response_bytes)
+            finally:
+                self.client_connection.close()
+
+    def get_environ(self):
+        env = {}
+        # The following code snippet does not follow PEP8 conventions
+        # but it's formatted the way it is for demonstration purposes
+        # to emphasize the required variables and their values
+        #
+        # Required WSGI variables
+        env['wsgi.version']      = (1, 0)
+        env['wsgi.url_scheme']   = 'http'
+        env['wsgi.input']        = io.StringIO(self.request_data)
+        env['wsgi.errors']       = sys.stderr
+        env['wsgi.multithread']  = False
+        env['wsgi.multiprocess'] = False
+        env['wsgi.run_once']     = False
+        # Required CGI variables
+        env['REQUEST_METHOD']    = self.request_method    # GET
+        env['PATH_INFO']         = self.path              # /hello
+        env['SERVER_NAME']       = self.server_name       # localhost
+        env['SERVER_PORT']       = str(self.server_port)  # 8888
+        return env
 
 def make_server(server_address, application):
     server = WSGIServer(server_address)
