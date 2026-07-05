@@ -35,49 +35,57 @@ class WSGIServer(object):
             ('Server', 'WSGIServer 0.2'),
         ]
         self.headers_set = [status, response_headers + server_headers]
+
+    
+    def send_response(self, result):
+        status, response_headers = self.headers_set
+        response = f'HTTP/1.1 {status}\r\n'
+        for header in response_headers:
+            response += '{0}: {1}\r\n'.format(*header)
+            response += '\r\n'
+            for data in result:
+                response += data.decode('utf-8')
+            # Print formatted response data a la 'curl -v'
+            print(''.join(
+                f'> {line}\n' for line in response.splitlines()
+            ))
+        return response
+    
     def serve_forever(self):
         listen_socket = self.listen_socket
         while True:
-        # Wait for client connections
-            self.client_connection, client_address = listen_socket.accept()
+            # Wait for client connections
+            self.client_connection, _ = listen_socket.accept()
             # Get the client request
-            self.request_data = request_data = self.client_connection.recv(1024).decode()
-            print(request_data)
+            self.request_data = self.client_connection.recv(1024).decode()
+            print(self.request_data)
             print(''.join(
-                f'< {line}\n' for line in request_data.splitlines()
+                f'< {line}\n' for line in self.request_data.splitlines()
             ))
-            request_line = request_data.splitlines()[0]
-            request_line = request_line.rstrip('\r\n')
+            request_line = self.parse_data(self.request_data)
             # Break down the request line into components
             (self.request_method,  # GET
             self.path,            # /hello
             self.request_version  # HTTP/1.1
             ) = request_line.split()
+
             env = self.get_environ()
             result = self.application(env, self.start_response)
             try:
-                status, response_headers = self.headers_set
-                response = f'HTTP/1.1 {status}\r\n'
-                for header in response_headers:
-                    response += '{0}: {1}\r\n'.format(*header)
-                response += '\r\n'
-                for data in result:
-                    response += data.decode('utf-8')
-                # Print formatted response data a la 'curl -v'
-                print(''.join(
-                    f'> {line}\n' for line in response.splitlines()
-                ))
+                response=self.send_response(result)
                 response_bytes = response.encode()
                 self.client_connection.sendall(response_bytes)
             finally:
                 self.client_connection.close()
 
+    def parse_data(self, request_data: str):
+        request_line = self.request_data.splitlines()[0]
+        request_line = request_line.rstrip('\r\n')
+        return request_line
+    
+
     def get_environ(self):
         env = {}
-        # The following code snippet does not follow PEP8 conventions
-        # but it's formatted the way it is for demonstration purposes
-        # to emphasize the required variables and their values
-        #
         # Required WSGI variables
         env['wsgi.version']      = (1, 0)
         env['wsgi.url_scheme']   = 'http'
