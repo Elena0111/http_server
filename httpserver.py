@@ -43,19 +43,17 @@ class WSGIServer(object):
         for header in response_headers:
             response += '{0}: {1}\r\n'.format(*header)
             response += '\r\n'
-            for data in result:
-                response += data.decode('utf-8')
+        for data in result:
+            response += data.decode('utf-8')
         return response
     
     def serve_forever(self):
         listen_socket = self.listen_socket
         while True:
-            # Wait for client connections
+     
             self.client_connection, _ = listen_socket.accept()
-            # Get the client request
             self.request_data = self.client_connection.recv(1024).decode()
             request_line = self.parse_data(self.request_data)
-            # Break down the request line into components
             (self.request_method,  # GET
             self.path,            # /hello
             self.request_version  # HTTP/1.1
