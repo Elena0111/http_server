@@ -6,6 +6,7 @@
 import socket
 import io
 import sys
+import os
 class WSGIServer(object):
 
     def __init__(self, server_address):
@@ -51,22 +52,31 @@ class WSGIServer(object):
         listen_socket = self.listen_socket
         while True:
      
-            self.client_connection, _ = listen_socket.accept()
-            self.request_data = self.client_connection.recv(1024).decode()
-            request_line = self.parse_data(self.request_data)
-            (self.request_method,  # GET
-            self.path,            # /hello
-            self.request_version  # HTTP/1.1
-            ) = request_line.split()
+            client_connection, _ = listen_socket.accept()
+            pid = os.fork()
+            if pid == 0:
+                listen_socket.close()
+                try:
+                    self.request_data = client_connection.recv(1024).decode()
+                    request_line = self.parse_data(self.request_data)
+                    (self.request_method,  # GET
+                    self.path,            # /hello
+                    self.request_version  # HTTP/1.1
+                    ) = request_line.split()
 
-            env = self.get_environ()
-            result = self.application(env, self.start_response)
-            try:
-                response=self.send_response(result)
-                response_bytes = response.encode()
-                self.client_connection.sendall(response_bytes)
-            finally:
-                self.client_connection.close()
+                    env = self.get_environ()
+                    result = self.application(env, self.start_response)
+                    response=self.send_response(result)
+                    response_bytes = response.encode()
+                    client_connection.sendall(response_bytes)
+                finally:
+                    client_connection.close()
+                os.exit(0)
+            else:
+                # Parent process
+
+                # Parent doesn't handle this client
+                client_connection.close()
 
     def parse_data(self, request_data: str):
         request_line = self.request_data.splitlines()[0]
